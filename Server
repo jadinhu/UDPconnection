@@ -1,0 +1,81 @@
+/**
+ * Server.cs
+ * Created by: Jadson Almeida [jadson.sistemas@gmail.com]
+ * Created on: 08/04/19 (dd/mm/yy)
+ * Updated on: 09/04/19 (dd/mm/yy)
+ */
+package udp;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+
+import window.WindowDisplay;
+
+/**
+ * UDP server controller.
+ * 
+ * @author Jadson
+ */
+public class Server implements Runnable, IClose {
+
+	DatagramSocket serverSocket;
+	InetAddress ipAddress;
+	int serverPort = 9876;
+	int clientPort = 9875;
+	Thread thread;
+	WindowDisplay window;
+	SendData sendData;
+
+	public void Start() {
+		Setup();
+		thread = new Thread(this);
+		thread.run();
+	}
+
+	void Setup() {
+		try {
+			serverSocket = new DatagramSocket(serverPort);
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+				public void run() {
+					serverSocket.close();
+					window.AddLineToLabel("Socket server fechado!");
+				}
+			});
+			sendData = new SendData(serverSocket, ipAddress, clientPort);
+			window = new WindowDisplay("SERVER", sendData, this);
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void run() {
+		try {
+			byte[] receiveData = new byte[1024];
+			int counter = 0;
+			while (true) {
+				DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+				window.AddLineToLabel(
+						"Tentativa " + ++counter + ". Esperando por datagrama UDP na porta " + serverPort);
+				serverSocket.receive(receivePacket);
+				window.AddLineToLabel("recebido...");
+				String sentence = new String(receivePacket.getData());
+				window.AddLineToLabel("RECEIVED: " + sentence);
+				ipAddress = receivePacket.getAddress();
+				clientPort = receivePacket.getPort(); // pega dinamicamente
+				sendData.Update(serverSocket, ipAddress, clientPort);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void Close() {
+		serverSocket.close();
+		Runtime.getRuntime().halt(0);
+	}
+}
